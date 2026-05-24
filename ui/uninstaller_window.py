@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                 QLabel, QPushButton, QScrollArea, QFrame,
                                 QMessageBox, QSizePolicy)
 from PySide6.QtCore import Qt, QRect
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QLinearGradient, QRegion, QPainterPath
 
 
 # ── path helpers (identical to main_window.py) ────────────────────────────────
@@ -170,19 +170,17 @@ class UninstallWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("FXD Pipeline Uninstaller")
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setFixedSize(420, 540)
         self.setStyleSheet(_STYLESHEET)
 
-        # Load optional header background image.
-        # Drop any image named bg_header.png (or .jpg) into assets/ to enable it.
+        # Load the header image.
         self._bg_pixmap = None
-        for ext in ("png", "jpg", "jpeg"):
-            candidate = _get_base_path() / "assets" / f"bg_header.{ext}"
-            if candidate.exists():
-                px = QPixmap(str(candidate))
-                if not px.isNull():
-                    self._bg_pixmap = px
-                break
+        candidate = _get_base_path() / "assets" / "uninstall.png"
+        if candidate.exists():
+            px = QPixmap(str(candidate))
+            if not px.isNull():
+                self._bg_pixmap = px
 
         self._setup_ui()
         self._load_versions()
@@ -190,6 +188,34 @@ class UninstallWindow(QWidget):
         icon_path = _get_icon_path()
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
+
+        # For dragging the window
+        self.offset = None
+
+    def mousePressEvent(self, event):
+        """
+        Called when the mouse is pressed.
+        Saves the position to calculate offset for dragging.
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.offset = (event.pos())
+
+    # ── Move window ──────────────────────────────────────────────────────────────
+
+    def mouseMoveEvent(self, event):
+        """
+        Called when the mouse is moved while clicking.
+        Moves the window accordingly.
+        """
+        if self.offset is not None and event.buttons() == Qt.MouseButton.LeftButton:
+            current_pos = (event.pos())
+            self.move(self.pos() + current_pos - self.offset)
+
+    def mouseReleaseEvent(self, event):
+        """
+        Reset the offset when the mouse is released.
+        """
+        self.offset = None
 
     # ── painting ──────────────────────────────────────────────────────────────
 
@@ -214,7 +240,22 @@ class UninstallWindow(QWidget):
             # Overlay so text stays legible over any image
             painter.fillRect(header_rect, QColor(5, 20, 36, 170))
 
+            # Gradient fade at the bottom of header so there is no hard cut
+            fade_h = 48
+            fade_rect = QRect(0, header_rect.bottom() - fade_h + 1, self.width(), fade_h)
+            grad = QLinearGradient(0, fade_rect.top(), 0, fade_rect.bottom())
+            grad.setColorAt(0.0, QColor(5, 20, 36, 0))
+            grad.setColorAt(1.0, QColor(5, 20, 36, 255))
+            painter.fillRect(fade_rect, grad)
+
         painter.end()
+
+        # CREATE ROUND BORDERS BY MASK
+        mask = QPainterPath()
+        # Adjust the radius as needed
+        mask.addRoundedRect(self.rect(), 10, 10)
+        # Set mask for the window
+        self.setMask(QRegion(mask.toFillPolygon().toPolygon()))
 
     # ── layout ────────────────────────────────────────────────────────────────
 

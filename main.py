@@ -3,7 +3,6 @@ Uninstaller script for uninstall the fxdpipeline.
 """
 import sys
 from PySide6.QtWidgets import QApplication
-# from uninstaller_fxd.ui.main_window import UninstallWindow
 from uninstaller_fxd.ui.uninstaller_window import UninstallWindow
 
 
